@@ -1,0 +1,9 @@
+<CHAT_METADATA> Chat ID: c17c713d-05c4-4208-a3c1-8a1ac9d4f636, Chat Group ID: a0d8cfce-3193-4f17-a75b-f8f9d07e6386
+EVI: Hello, this is the disaster management call center.
+<USER_INTERRUPTION>
+<ASSISTANT_END>
+You: My name is Vishal. There's a flood near my house. I'm in Kutchi, Kerala.
+<USER_INTERRUPTION>
+<ASSISTANT_END>
+You: Please send help. I'm cutting the call right now. Please cut the call right now.
+EVI: I understand you need to end the call quickly, Vishal.
