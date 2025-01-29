@@ -23,7 +23,6 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-
 conversations = None
 async def main() -> None:
   # Paste your Hume API key here
@@ -33,8 +32,7 @@ async def main() -> None:
   # Start streaming EVI over your device's microphone and speakers
   with open ("conversations.txt", "w") as f:
     f.write("")
-  
-  
+
   async with client.connect(config_id=os.getenv("CONFIG_ID")) as socket:
       conv = None
       try:
@@ -43,11 +41,9 @@ async def main() -> None:
         print(e)
       finally:
         print(conv)
-        
-      
+
   with open("conversations.txt", "r") as f:
     conversations = f.read()
-
 
 def get_conversation():
   # Keep reading the conversation file that is asyncronously written to by the chat client and wait for 'end the call' to be said by the user. then return the conversation
@@ -56,7 +52,7 @@ def get_conversation():
     chat_summary = client.chat.completions.create(messages=[
       {
         "role": "system",
-        "content": """Provide criticality of the call, isSpam bool, user name, user location in the format only:
+        "content": """You must respond with a valid JSON object containing exactly these fields. Provide criticality of the call, isSpam bool, user name, user location in the format only:
             {
               "summary": "The summary of the conversation",
               "criticality": "The criticality of the call(eg. high, medium, low)",
@@ -65,13 +61,14 @@ def get_conversation():
               "user": "User name (Unknown if not provided)",
               "location": "User location (Unknown if not provided)"
             }
+            Do not include any other text or formatting.
         """.strip()
       }, 
       {
         "role": "user",
         "content": conversations
       }
-      
+
       ], model='llama3-8b-8192',stream=False)
     print(chat_summary.choices[0].message.content)
     json_data = json.loads(chat_summary.choices[0].message.content)
@@ -80,7 +77,7 @@ def get_conversation():
     c.execute("INSERT INTO conversations VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (str(uuid.uuid4()), conversations, str(uuid.uuid4()), json_data["summary"], json_data["criticality"], json_data["isSpam"], json_data["user"], json_data["location"]))
     conn.commit()
     conn.close()
-  
+
 if __name__ == "__main__":
   try:
     asyncio.run(main())

@@ -1,9 +1,10 @@
-<CHAT_METADATA> Chat ID: c17c713d-05c4-4208-a3c1-8a1ac9d4f636, Chat Group ID: a0d8cfce-3193-4f17-a75b-f8f9d07e6386
-EVI: Hello, this is the disaster management call center.
-<USER_INTERRUPTION>
+<CHAT_METADATA> Chat ID: bbe3b44b-2e2f-45fd-bd6c-d10eb9a2c74f, Chat Group ID: a3c4d118-007e-4947-aa30-c1d8f0dfddc8
+EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: My name is Vishal. There's a flood near my house. I'm in Kutchi, Kerala.
-<USER_INTERRUPTION>
+You: My name is Claire. I'm on a rooftop right now. My arms and legs are off by a boulder. I'm bleeding right now. Please help me.
+EVI: Claire, I'm so sorry to hear that you're in this situation.
+EVI: Can you please stay calm and help me assess the situation?
+EVI: Are you alone on the rooftop?
+EVI: Are there any other rocks or debris nearby that could potentially fall on you or make the situation worse?
+EVI: Can you give me an idea of how badly you're bleeding and if you're experiencing any severe pain or discomfort?
 <ASSISTANT_END>
-You: Please send help. I'm cutting the call right now. Please cut the call right now.
-EVI: I understand you need to end the call quickly, Vishal.
