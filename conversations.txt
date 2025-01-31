@@ -1,10 +1,13 @@
-<CHAT_METADATA> Chat ID: bbe3b44b-2e2f-45fd-bd6c-d10eb9a2c74f, Chat Group ID: a3c4d118-007e-4947-aa30-c1d8f0dfddc8
+<CHAT_METADATA> Chat ID: e25e05f3-2445-4eff-b410-25b6a1360391, Chat Group ID: b88c59eb-ac3f-4015-b716-3a66108c7d59
 EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: My name is Claire. I'm on a rooftop right now. My arms and legs are off by a boulder. I'm bleeding right now. Please help me.
-EVI: Claire, I'm so sorry to hear that you're in this situation.
-EVI: Can you please stay calm and help me assess the situation?
-EVI: Are you alone on the rooftop?
-EVI: Are there any other rocks or debris nearby that could potentially fall on you or make the situation worse?
-EVI: Can you give me an idea of how badly you're bleeding and if you're experiencing any severe pain or discomfort?
+You: Hi. My name is Marie.
+You: I'm calling from Marina Bay in Chennai.
+You: My house is on fire.
+You: Please help me.
+EVI: Oh Marie, I'm so sorry to hear that your house is on fire.
+EVI: Can you tell me more about the situation?
+EVI: Where exactly are you located within Marina Bay in Chennai?
+EVI: And can you tell me if anyone else is with you, or if you're alone?
 <ASSISTANT_END>
+You: But for now, thirty seconds later for the HETs.

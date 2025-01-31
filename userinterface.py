@@ -41,7 +41,7 @@ class ConversationThread(QThread):
 class VoiceAnalysisUI(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Voice Call Analysis UI")
+        self.setWindowTitle("Emergency Call Center Assistant for Disaster Response")
         self.setGeometry(100, 100, 1000, 800)
         
         # Create central widget and main layout
@@ -50,7 +50,7 @@ class VoiceAnalysisUI(QMainWindow):
         layout = QVBoxLayout(central_widget)
         
         # Header
-        header_label = QLabel("Voice Call Analysis System")
+        header_label = QLabel("Call Details")
         header_label.setFont(QFont("Arial", 20))
         header_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(header_label)
