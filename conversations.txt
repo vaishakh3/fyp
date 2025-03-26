@@ -1,12 +1,14 @@
-<CHAT_METADATA> Chat ID: f8bb3639-506a-4aa9-b548-f0c80d5d78d4, Chat Group ID: 6940a524-5c98-4b99-b4a6-28071626362a
+<CHAT_METADATA> Chat ID: 3bd6f876-f734-48c2-80bd-1f309cfdcb68, Chat Group ID: 209f965f-fbc2-45c4-a704-45f8256dd66f
 EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: Hello? Please state your emergency.
-EVI: Thank you for answering.
+You: Hello?
+You: Please state your emergency.
+You: My name is Arjun VK. I'm calling from a house in Gorikou. There are goons surrounding my house that are threatening
+EVI: Arjun VK, thank you for calling the emergency services.
 <USER_INTERRUPTION>
 <ASSISTANT_END>
-You: My name is Abdul. I'm calling from the Burj Khalifa in Dubai.
-You: Please help me. My apartment is on fire. I am in grave danger.
-EVI: Hello Abdul, thank you for reaching out to us.
-EVI: I'm so sorry to hear that your apartment is on fire.
-EVI: Can you please provide me with more details about the situation?
+You: I'll just be careful. Thank you for calling the emergency
+EVI: Let's take care of this situation.
+EVI: Can you please provide me with your exact location in Gorikou, Arjun?
+<USER_INTERRUPTION>
+<ASSISTANT_END>
