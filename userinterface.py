@@ -3,9 +3,10 @@ import subprocess
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QPushButton, QLabel, QTreeWidget, 
-                           QTreeWidgetItem, QMessageBox, QTextEdit)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+                           QTreeWidgetItem, QMessageBox, QTextEdit, QSplitter)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
 from PyQt5.QtGui import QFont
+from PyQt5.QtWebEngineWidgets import QWebEngineView
 import sqlite3
 import signal
 from datetime import datetime
@@ -107,7 +108,7 @@ class VoiceAnalysisUI(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Emergency Call Center Assistant for Disaster Response")
-        self.setGeometry(100, 100, 1000, 800)
+        self.setGeometry(100, 100, 1400, 900)  # Made window larger for better layout
         
         # Create central widget and main layout
         central_widget = QWidget()
@@ -115,75 +116,172 @@ class VoiceAnalysisUI(QMainWindow):
         layout = QVBoxLayout(central_widget)
         
         # Header
-        header_label = QLabel("Call Details")
-        header_label.setFont(QFont("Arial", 20))
+        header_label = QLabel("Emergency Call Center Assistant")
+        header_label.setFont(QFont("Arial", 20, QFont.Bold))
         header_label.setAlignment(Qt.AlignCenter)
+        header_label.setStyleSheet("margin-bottom: 10px;")
         layout.addWidget(header_label)
         
         # Buttons
         button_layout = QHBoxLayout()
         
         self.start_button = QPushButton("Start Conversation")
-        self.start_button.setStyleSheet("background-color: green; color: white;")
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
         self.start_button.clicked.connect(self.start_conversation_thread)
         button_layout.addWidget(self.start_button)
         
         self.end_button = QPushButton("End Call")
-        self.end_button.setStyleSheet("background-color: orange; color: white;")
+        self.end_button.setStyleSheet("""
+            QPushButton {
+                background-color: #ff9800;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #f57c00;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
         self.end_button.clicked.connect(self.end_conversation)
         self.end_button.setEnabled(False)
         button_layout.addWidget(self.end_button)
         
         exit_button = QPushButton("Exit")
-        exit_button.setStyleSheet("background-color: red; color: white;")
+        exit_button.setStyleSheet("""
+            QPushButton {
+                background-color: #f44336;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+        """)
         exit_button.clicked.connect(self.close)
         button_layout.addWidget(exit_button)
         
         layout.addLayout(button_layout)
         
-        # Live Transcript Area
+        # Create top section splitter (Transcript and Map)
+        top_splitter = QSplitter(Qt.Horizontal)
+        
+        # Left side - Transcript
+        transcript_widget = QWidget()
+        transcript_layout = QVBoxLayout(transcript_widget)
+        
         transcript_label = QLabel("Live Transcript")
-        transcript_label.setFont(QFont("Arial", 12))
-        layout.addWidget(transcript_label)
+        transcript_label.setFont(QFont("Arial", 12, QFont.Bold))
+        transcript_label.setStyleSheet("color: #2196F3; margin-bottom: 5px;")
+        transcript_layout.addWidget(transcript_label)
         
         self.transcript_area = QTextEdit()
         self.transcript_area.setReadOnly(True)
-        self.transcript_area.setMinimumHeight(200)
+        self.transcript_area.setMinimumHeight(300)
         self.transcript_area.setStyleSheet("""
             QTextEdit {
-                background-color: #f0f0f0;
-                border: 1px solid #ccc;
-                padding: 5px;
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 10px;
                 font-family: Arial;
                 font-size: 12px;
             }
         """)
-        layout.addWidget(self.transcript_area)
+        transcript_layout.addWidget(self.transcript_area)
         
-        # History Label
+        # Right side - Map
+        map_widget = QWidget()
+        map_layout = QVBoxLayout(map_widget)
+        
+        map_label = QLabel("Location Map")
+        map_label.setFont(QFont("Arial", 12, QFont.Bold))
+        map_label.setStyleSheet("color: #2196F3; margin-bottom: 5px;")
+        map_layout.addWidget(map_label)
+        
+        self.map_view = QWebEngineView()
+        self.map_view.setMinimumWidth(500)
+        self.map_view.setMinimumHeight(300)
+        self.map_view.setUrl(QUrl('https://www.openstreetmap.org'))
+        map_layout.addWidget(self.map_view)
+        
+        # Add transcript and map to top splitter
+        top_splitter.addWidget(transcript_widget)
+        top_splitter.addWidget(map_widget)
+        top_splitter.setStretchFactor(0, 1)  # Give transcript more space
+        top_splitter.setStretchFactor(1, 1)  # Give map equal space
+        
+        # Add top splitter to main layout
+        layout.addWidget(top_splitter)
+        
+        # Bottom section - Conversation History
+        history_widget = QWidget()
+        history_layout = QVBoxLayout(history_widget)
+        
         history_label = QLabel("Conversation History")
-        history_label.setFont(QFont("Arial", 12))
-        layout.addWidget(history_label)
+        history_label.setFont(QFont("Arial", 12, QFont.Bold))
+        history_label.setStyleSheet("color: #2196F3; margin: 10px 0px 5px 0px;")
+        history_layout.addWidget(history_label)
         
-        # Conversation TreeWidget
         self.conversation_tree = QTreeWidget()
         self.conversation_tree.setHeaderLabels([
             "UID", "Conversation", "Timestamp", "Summary",
             "Criticality", "isSpam", "User", "Location"
         ])
         self.conversation_tree.setColumnCount(8)
+        self.conversation_tree.setAlternatingRowColors(True)
+        self.conversation_tree.setStyleSheet("""
+            QTreeWidget {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+            QTreeWidget::item:alternate {
+                background-color: #e0e0e0;
+            }
+            QHeaderView::section {
+                background-color: #2196F3;
+                color: white;
+                padding: 5px;
+                border: 1px solid #1976D2;
+            }
+        """)
         
         # Set column widths
         self.conversation_tree.setColumnWidth(0, 100)  # uid
-        self.conversation_tree.setColumnWidth(1, 200)  # conversation
-        self.conversation_tree.setColumnWidth(2, 100)  # timestamp
-        self.conversation_tree.setColumnWidth(3, 200)  # summary
-        self.conversation_tree.setColumnWidth(4, 80)   # criticality
-        self.conversation_tree.setColumnWidth(5, 60)   # isSpam
-        self.conversation_tree.setColumnWidth(6, 100)  # user
-        self.conversation_tree.setColumnWidth(7, 100)  # location
+        self.conversation_tree.setColumnWidth(1, 300)  # conversation
+        self.conversation_tree.setColumnWidth(2, 150)  # timestamp
+        self.conversation_tree.setColumnWidth(3, 300)  # summary
+        self.conversation_tree.setColumnWidth(4, 100)  # criticality
+        self.conversation_tree.setColumnWidth(5, 80)   # isSpam
+        self.conversation_tree.setColumnWidth(6, 150)  # user
+        self.conversation_tree.setColumnWidth(7, 150)  # location
         
-        layout.addWidget(self.conversation_tree)
+        history_layout.addWidget(self.conversation_tree)
+        layout.addWidget(history_widget)
+        
+        # Set layout proportions
+        layout.setStretchFactor(top_splitter, 2)  # Give top section more space
+        layout.setStretchFactor(history_widget, 1)  # Give history less space
         
         # Initialize thread and timers
         self.conv_thread = None
@@ -283,6 +381,18 @@ class VoiceAnalysisUI(QMainWindow):
         
         self.update_timer.start(1000)
 
+    def update_map_location(self, location):
+        if location and location.lower() != "unknown":
+            formatted_location = location.replace(' ', '+')
+            self.map_view.setUrl(
+                QUrl(f'https://www.openstreetmap.org/search?query={formatted_location}')
+            )
+            print(f"Updated map to show location: {location}")
+        else:
+            # Reset to default view if location is unknown
+            self.map_view.setUrl(QUrl('https://www.openstreetmap.org'))
+            print("Reset map to default view (location unknown)")
+
     def check_summary_completion(self):
         if os.path.exists("summary_complete.txt"):
             print("Summary completion detected, reading conversation ID...")
@@ -300,6 +410,9 @@ class VoiceAnalysisUI(QMainWindow):
                 
                 if result:
                     print(f"Verified conversation {conversation_id} exists in database")
+                    # Update map with location from the conversation
+                    location = result[7]  # Location is the 8th column (index 7)
+                    self.update_map_location(location)
                 else:
                     print(f"Warning: Conversation {conversation_id} not found in database")
                 

@@ -1,10 +1,12 @@
-<CHAT_METADATA> Chat ID: 27633b2c-98d9-4a0f-b8e5-e9aa78c7fa69, Chat Group ID: d54c5d32-4448-4603-b517-7caf6da06303
+<CHAT_METADATA> Chat ID: f8bb3639-506a-4aa9-b548-f0c80d5d78d4, Chat Group ID: 6940a524-5c98-4b99-b4a6-28071626362a
 EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: Hello?
-You: Can you state your emergency? My name is Burha Bushpam, and I'm calling from in Kannur.
-You: There's a huge mob fight going around here. Please help me. They have guns I'm afraid.
-EVI: Burha Bushpam, thank you for reaching out to our emergency call center.
-EVI: I'm so sorry to hear that there's a mob fight happening in Kannur, and that there are guns involved.
+You: Hello? Please state your emergency.
+EVI: Thank you for answering.
 <USER_INTERRUPTION>
 <ASSISTANT_END>
+You: My name is Abdul. I'm calling from the Burj Khalifa in Dubai.
+You: Please help me. My apartment is on fire. I am in grave danger.
+EVI: Hello Abdul, thank you for reaching out to us.
+EVI: I'm so sorry to hear that your apartment is on fire.
+EVI: Can you please provide me with more details about the situation?
