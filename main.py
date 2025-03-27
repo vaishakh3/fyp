@@ -107,32 +107,103 @@ def get_conversation():
                 return
             
             print("Generating summary with Groq...")
-            chat_summary = client.chat.completions.create(messages=[
-                {
-                    "role": "system",
-                    "content": """You must respond with a valid JSON object containing exactly these fields. Provide criticality of the call, isSpam bool, user name, user location in the format only:
+            try:
+                chat_summary = client.chat.completions.create(messages=[
+                    {
+                        "role": "system",
+                        "content": """You must analyze the conversation carefully and respond with a valid JSON object containing exactly these fields:
+                            {
+                              "summary": "A brief summary of the conversation",
+                              "criticality": "Criticality of the emergency call using these guidelines: HIGH (immediate life-threatening situations, major fires, violent crimes in progress), MEDIUM (non-life threatening injuries, property damage, ongoing but non-violent crimes), LOW (minor incidents, information requests, non-emergency situations)",
+                              "isSpam": "True if the call appears to be a prank, contains no actual emergency, is deliberately misleading, or the caller is not serious. False for genuine emergency calls",
+                              "department": "Department name (Fire, Police, Medical, or combination if multiple services needed)",
+                              "user": "User name (Unknown if not provided)",
+                              "location": "User location (Unknown if not provided)"
+                            }
+                            Carefully examine the conversation context to accurately determine criticality and spam status. Do not default to HIGH criticality unless truly warranted by the situation described. Do not include any other text or formatting.
+                        """.strip()
+                    },
+                    {
+                        "role": "user",
+                        "content": conversations
+                    }
+                ], model='llama3-8b-8192', stream=False)
+                
+                print("Received response from model:", chat_summary.choices[0].message.content)
+                response_content = chat_summary.choices[0].message.content.strip()
+                
+                # Special handling for malformed JSON responses
+                if not (response_content.startswith('{') and response_content.endswith('}')):
+                    print("Warning: Response is not valid JSON, attempting to fix...")
+                    # Try to extract JSON from the response if it's embedded in other text
+                    import re
+                    json_match = re.search(r'\{.*\}', response_content, re.DOTALL)
+                    if json_match:
+                        response_content = json_match.group(0)
+                        print("Extracted JSON:", response_content)
+                    else:
+                        # Create default JSON if extraction fails
+                        print("Could not extract JSON, creating default response...")
+                        response_content = """
                         {
-                          "summary": "The summary of the conversation",
-                          "criticality": "The criticality of the call(eg. high, medium, low)",
-                          "isSpam": "True or False",
-                          "department": "Department name(Fire, Police, Medical)",
-                          "user": "User name (Unknown if not provided)",
-                          "location": "User location (Unknown if not provided)"
+                          "summary": "Unable to determine details from conversation",
+                          "criticality": "LOW",
+                          "isSpam": "True",
+                          "department": "Unknown",
+                          "user": "Unknown",
+                          "location": "Unknown"
                         }
-                        Do not include any other text or formatting.
-                    """.strip()
-                },
-                {
-                    "role": "user",
-                    "content": conversations
+                        """
+                        print("Created default JSON:", response_content)
+                
+                try:
+                    json_data = json.loads(response_content)
+                    print("Successfully parsed JSON data")
+                except json.JSONDecodeError as je:
+                    print(f"JSON parsing error: {je}")
+                    # Create default json_data as fallback
+                    json_data = {
+                        "summary": "Unable to parse conversation details",
+                        "criticality": "LOW",
+                        "isSpam": "True",
+                        "department": "Unknown",
+                        "user": "Unknown",
+                        "location": "Unknown"
+                    }
+                    print("Using default JSON data due to parsing error")
+                
+            except Exception as model_error:
+                print(f"Error generating summary with model: {model_error}")
+                # Create default json_data
+                json_data = {
+                    "summary": "Error processing conversation",
+                    "criticality": "LOW",
+                    "isSpam": "True",
+                    "department": "Unknown",
+                    "user": "Unknown",
+                    "location": "Unknown"
                 }
-            ], model='llama3-8b-8192', stream=False)
-            
-            print("Received response from model:", chat_summary.choices[0].message.content)
-            json_data = json.loads(chat_summary.choices[0].message.content)
+                print("Using default JSON data due to model error")
             
             # Convert string "True"/"False" to boolean for isSpam
-            is_spam = True if json_data["isSpam"].lower() == "true" else False
+            try:
+                is_spam = True if json_data["isSpam"].lower() == "true" else False
+            except (KeyError, AttributeError) as e:
+                print(f"Error processing isSpam value: {e}")
+                is_spam = True  # Default to True for safety
+            
+            try:
+                # Ensure criticality is one of the expected values
+                valid_criticalities = ["HIGH", "MEDIUM", "LOW"]
+                if json_data.get("criticality", "").upper() not in valid_criticalities:
+                    print(f"Invalid criticality value: {json_data.get('criticality')}")
+                    json_data["criticality"] = "LOW"  # Default to low if invalid
+                else:
+                    # Normalize to uppercase
+                    json_data["criticality"] = json_data["criticality"].upper()
+            except Exception as e:
+                print(f"Error processing criticality: {e}")
+                json_data["criticality"] = "LOW"  # Default to low
             
             # Get current timestamp
             current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -141,6 +212,12 @@ def get_conversation():
             conn = sqlite3.connect('conversation.db')
             c = conn.cursor()
             uid = str(uuid.uuid4())
+            
+            # Fill in missing fields with defaults if necessary
+            for field in ["summary", "department", "user", "location"]:
+                if field not in json_data or not json_data[field]:
+                    json_data[field] = "Unknown"
+                    print(f"Using default value for missing field: {field}")
             
             # Print values being inserted
             values = (uid, conversations, current_time, json_data["summary"],
@@ -177,6 +254,49 @@ def get_conversation():
             
     except Exception as e:
         print("Error during conversation processing:", str(e))
+        import traceback
+        print("Full traceback:")
+        traceback.print_exc()
+        
+        # Attempt to create a record even when an error occurs
+        try:
+            print("Attempting to create error record in database...")
+            conn = sqlite3.connect('conversation.db')
+            c = conn.cursor()
+            uid = str(uuid.uuid4())
+            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Get conversation text if possible
+            try:
+                with open("conversations.txt", "r") as f:
+                    conversations = f.read()
+            except:
+                conversations = "Error retrieving conversation text"
+            
+            # Create error record
+            error_values = (
+                uid, 
+                conversations,
+                current_time,
+                f"Error processing conversation: {str(e)}",
+                "LOW",  # Default criticality
+                True,   # Mark as spam for error cases
+                "Unknown",
+                "Unknown"
+            )
+            
+            c.execute("INSERT INTO conversations VALUES (?, ?, ?, ?, ?, ?, ?, ?)", error_values)
+            conn.commit()
+            
+            # Create summary completion signal
+            with open("summary_complete.txt", "w") as f:
+                f.write(uid)
+            
+            conn.close()
+            print("Created error record in database with uid:", uid)
+        except Exception as recovery_error:
+            print(f"Failed to create error record: {recovery_error}")
+        
         raise
 
 if __name__ == "__main__":

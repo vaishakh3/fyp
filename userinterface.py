@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QTreeWidgetItem, QMessageBox, QTextEdit, QSplitter,
                            QStackedWidget, QLineEdit, QFrame, QGridLayout,
                            QComboBox, QListWidget, QListWidgetItem)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl, QSize
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtChart import (QChart, QChartView, QPieSeries, QBarSeries,
@@ -15,6 +15,7 @@ import sqlite3
 import signal
 from datetime import datetime
 from collections import Counter
+import hashlib  # For password hashing
 
 class ConversationThread(QThread):
     finished = pyqtSignal()
@@ -272,6 +273,26 @@ class VoiceAnalysisUI(QMainWindow):
         self.dispatch_button.clicked.connect(self.show_dispatch_options)
         button_layout.addWidget(self.dispatch_button)
 
+        # Add Mark as Resolved button
+        self.resolve_button = QPushButton("Mark as Resolved")
+        self.resolve_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.resolve_button.clicked.connect(self.mark_as_resolved)
+        button_layout.addWidget(self.resolve_button)
+
         # Create dispatch options container
         self.dispatch_options = QWidget()
         self.dispatch_options.setFixedHeight(44)
@@ -340,14 +361,14 @@ class VoiceAnalysisUI(QMainWindow):
                 background-color: #f5f5f5;
                 border: 1px solid #ddd;
                 border-radius: 8px;
-                padding: 10px;
+                padding: 5px;
             }
             QListWidget::item {
                 background-color: white;
                 border: 1px solid #e0e0e0;
                 border-radius: 8px;
-                padding: 10px;
-                margin-bottom: 8px;
+                padding: 1px;
+                margin-bottom: 4px;
             }
             QListWidget::item:selected {
                 background-color: #e3f2fd;
@@ -384,6 +405,7 @@ class VoiceAnalysisUI(QMainWindow):
         transcript_label.setStyleSheet("color: #2196F3; margin-bottom: 5px;")
         transcript_layout.addWidget(transcript_label)
         
+        # Create a styled transcript area with custom HTML display
         self.transcript_area = QTextEdit()
         self.transcript_area.setReadOnly(True)
         self.transcript_area.setMinimumHeight(300)
@@ -392,11 +414,93 @@ class VoiceAnalysisUI(QMainWindow):
                 background-color: #f5f5f5;
                 border: 1px solid #ddd;
                 border-radius: 4px;
-                padding: 10px;
+                padding: 5px;
                 font-family: Arial;
                 font-size: 12px;
             }
         """)
+        
+        # Set up basic HTML structure for chat-like display
+        self.transcript_area.setHtml("""
+            <html>
+            <head>
+                <style>
+                    body { 
+                        background-color: #f5f5f5; 
+                        font-family: Arial, sans-serif;
+                        margin: 0;
+                        padding: 5px;
+                    }
+                    .chat-container {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 10px;
+                    }
+                    .operator-message, .caller-message {
+                        max-width: 80%;
+                        padding: 10px 14px;
+                        border-radius: 18px;
+                        margin: 2px 0;
+                        position: relative;
+                        display: inline-block;
+                    }
+                    .operator-message {
+                        background-color: #e9e9e9;
+                        color: #333;
+                        align-self: flex-start;
+                        margin-right: auto;
+                        border-bottom-left-radius: 5px;
+                    }
+                    .caller-message {
+                        background-color: #2979FF;
+                        color: white;
+                        align-self: flex-end;
+                        margin-left: auto;
+                        border-bottom-right-radius: 5px;
+                    }
+                    .operator-icon, .caller-icon {
+                        width: 28px;
+                        height: 28px;
+                        background-color: #ccc;
+                        border-radius: 50%;
+                        display: inline-flex;
+                        align-items: center;
+                        justify-content: center;
+                        margin-right: 8px;
+                        vertical-align: top;
+                        text-align: center;
+                        font-size: 14px;
+                    }
+                    .operator-icon {
+                        background-color: #e0e0e0;
+                    }
+                    .caller-icon {
+                        background-color: #e0e0e0;
+                        margin-right: 0;
+                        margin-left: 8px;
+                    }
+                    .message-row {
+                        display: flex;
+                        margin-bottom: 12px;
+                        align-items: flex-start;
+                    }
+                    .operator-row {
+                        justify-content: flex-start;
+                    }
+                    .caller-row {
+                        justify-content: flex-end;
+                        flex-direction: row-reverse;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="chat-container">
+                    <h3 style="color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0;">CALL TRANSCRIPT</h3>
+                </div>
+            </body>
+            </html>
+        """)
+        
         transcript_layout.addWidget(self.transcript_area)
         
         # Add all sections to top splitter
@@ -930,9 +1034,25 @@ class VoiceAnalysisUI(QMainWindow):
         conversations = self.fetch_conversations()
         print(f"Fetched {len(conversations)} conversations from database")
         
+        # If no conversations found, add some sample data for testing
+        if not conversations:
+            print("No conversations found, adding sample data for testing")
+            sample_conversations = [
+                (1, "There's a fire at Golden Gate Bridge!", "2023-07-15 14:30:22", "Fire at Golden Gate Bridge", "HIGH", 0, "John Doe", "Golden Gate Bridge"),
+                (2, "Car accident on Main Street", "2023-07-15 15:45:10", "Accident at Main Street", "MEDIUM", 0, "Jane Smith", "Main Street"),
+                (3, "Medical emergency at Central Park", "2023-07-15 16:20:05", "Medical at Central Park", "HIGH", 0, "Robert Brown", "Central Park"),
+                (4, "Flooding in Downtown area", "2023-07-15 17:10:30", "Flooding at Downtown", "MEDIUM", 0, "Sarah Johnson", "Downtown"),
+                (5, "Gas leak reported near School", "2023-07-15 18:05:45", "Gas leak at School", "HIGH", 0, "Michael Wilson", "City School")
+            ]
+            conversations = sample_conversations
+        
         # Store the current scroll positions
         current_scroll = self.conversation_tree.verticalScrollBar().value()
         active_scroll = self.active_conversation_tree.verticalScrollBar().value()
+        
+        # Initialize call status dictionary if not exists
+        if not hasattr(self, 'call_status'):
+            self.call_status = {}  # uid -> {'dispatched': bool, 'resolved': bool}
         
         for idx, convo in enumerate(conversations):
             try:
@@ -960,30 +1080,65 @@ class VoiceAnalysisUI(QMainWindow):
                 # Add to active calls list
                 if idx < 5:  # Show only the 5 most recent calls
                     call_item = QListWidgetItem()
-                    call_widget = QWidget()
-                    call_layout = QVBoxLayout()
                     
-                    # Title with location
-                    title = QLabel(f"- {tree_values[7] if tree_values[7] != 'Unknown' else 'Unknown Location'}")
-                    title.setFont(QFont("Arial", 10, QFont.Bold))
-                    call_layout.addWidget(title)
+                    # Set background color based on status
+                    call_uid = tree_values[0]
                     
-                    # Timestamp
-                    timestamp = QLabel(tree_values[2])
-                    timestamp.setStyleSheet("color: #666;")
-                    call_layout.addWidget(timestamp)
+                    # Initialize status for new calls
+                    if call_uid not in self.call_status:
+                        self.call_status[call_uid] = {'dispatched': False, 'resolved': False}
                     
-                    # Summary
-                    summary = QLabel(tree_values[3][:100] + "..." if len(tree_values[3]) > 100 else tree_values[3])
-                    summary.setWordWrap(True)
-                    call_layout.addWidget(summary)
+                    status = self.call_status[call_uid]
                     
-                    call_widget.setLayout(call_layout)
-                    call_item.setSizeHint(call_widget.sizeHint())
+                    # Create main card widget
+                    call_widget = QFrame()
+                    call_widget.setObjectName("callCard")
+                    call_widget.setMinimumHeight(50)  # Set minimum height
+                    
+                    # Determine border color based on status
+                    border_color = "#F44336"  # Default red
+                    if status['resolved']:
+                        border_color = "#4CAF50"  # Green for resolved
+                    elif status['dispatched']:
+                        border_color = "#FFEB3B"  # Yellow for dispatched
+                    
+                    # Basic styling for all cards
+                    call_widget.setStyleSheet(f"""
+                        #callCard {{
+                            background-color: white;
+                            border: none;
+                            border-left: 4px solid {border_color};
+                            padding: 10px 15px;
+                        }}
+                    """)
+                    
+                    # Use a grid layout for more control
+                    card_layout = QGridLayout(call_widget)
+                    card_layout.setContentsMargins(5, 5, 5, 5)
+                    card_layout.setSpacing(2)
+                    
+                    # Create a label for emergency type and location with better visibility
+                    emergency_info = QLabel(f"{tree_values[3]} - {tree_values[7]}")
+                    emergency_info.setFont(QFont("Arial", 11, QFont.Bold))
+                    emergency_info.setStyleSheet("color: #212121; padding: 2px;")
+                    emergency_info.setWordWrap(True)
+                    
+                    # Time label
+                    time_label = QLabel(f"Time: {tree_values[2].split(' ')[1]}")  # Only show time portion
+                    time_label.setFont(QFont("Arial", 10))
+                    time_label.setStyleSheet("color: #666666; padding: 2px;")
+                    
+                    # Add widgets to layout
+                    card_layout.addWidget(emergency_info, 0, 0)
+                    card_layout.addWidget(time_label, 1, 0)
+                    
+                    # Apply final styling to item
+                    call_item.setSizeHint(QSize(call_widget.sizeHint().width(), 70))  # Force height
                     
                     # Store the conversation data in the item
                     call_item.setData(Qt.UserRole, convo)
                     
+                    # Add to list
                     self.active_calls_list.addItem(call_item)
                     self.active_calls_list.setItemWidget(call_item, call_widget)
                 
@@ -1011,9 +1166,125 @@ class VoiceAnalysisUI(QMainWindow):
     def update_transcript(self):
         try:
             with open("conversations.txt", "r") as f:
-                transcript = f.read()
-                self.transcript_area.setText(transcript)
-                self.transcript_area.moveCursor(self.transcript_area.textCursor().End)
+                transcript_text = f.read()
+                
+                # Parse the conversation into individual messages
+                lines = transcript_text.split("\n")
+                chat_html = "<div class=\"chat-container\">"
+                chat_html += "<h3 style=\"color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0;\">CALL TRANSCRIPT</h3>"
+                
+                for line in lines:
+                    if line.strip():
+                        if line.startswith("EVI:"):
+                            # Operator message
+                            message = line[4:].strip()
+                            chat_html += f"""
+                                <div class="message-row operator-row">
+                                    <div class="operator-icon">🤖</div>
+                                    <div class="operator-message">{message}</div>
+                                </div>
+                            """
+                        elif line.startswith("You:"):
+                            # Caller message
+                            message = line[4:].strip()
+                            chat_html += f"""
+                                <div class="message-row caller-row">
+                                    <div class="caller-icon">👤</div>
+                                    <div class="caller-message">{message}</div>
+                                </div>
+                            """
+                        elif not line.startswith("<"):  # Skip tags like <USER_INTERRUPTION>
+                            # System message or untagged line
+                            if line.strip():
+                                chat_html += f"""
+                                    <div style="text-align: center; color: #666; font-style: italic; margin: 8px 0; font-size: 12px;">
+                                        {line.strip()}
+                                    </div>
+                                """
+                
+                chat_html += "</div>"
+                
+                # Update the HTML content
+                self.transcript_area.setHtml(f"""
+                    <html>
+                    <head>
+                        <style>
+                            body {{ 
+                                background-color: #f5f5f5; 
+                                font-family: Arial, sans-serif;
+                                margin: 0;
+                                padding: 5px;
+                            }}
+                            .chat-container {{
+                                display: flex;
+                                flex-direction: column;
+                                gap: 10px;
+                            }}
+                            .operator-message, .caller-message {{
+                                max-width: 80%;
+                                padding: 10px 14px;
+                                border-radius: 18px;
+                                margin: 2px 0;
+                                position: relative;
+                                display: inline-block;
+                            }}
+                            .operator-message {{
+                                background-color: #e9e9e9;
+                                color: #333;
+                                align-self: flex-start;
+                                margin-right: auto;
+                                border-bottom-left-radius: 5px;
+                            }}
+                            .caller-message {{
+                                background-color: #2979FF;
+                                color: white;
+                                align-self: flex-end;
+                                margin-left: auto;
+                                border-bottom-right-radius: 5px;
+                            }}
+                            .operator-icon, .caller-icon {{
+                                width: 28px;
+                                height: 28px;
+                                background-color: #ccc;
+                                border-radius: 50%;
+                                display: inline-flex;
+                                align-items: center;
+                                justify-content: center;
+                                margin-right: 8px;
+                                vertical-align: top;
+                                text-align: center;
+                                font-size: 14px;
+                            }}
+                            .operator-icon {{
+                                background-color: #e0e0e0;
+                            }}
+                            .caller-icon {{
+                                background-color: #e0e0e0;
+                                margin-right: 0;
+                                margin-left: 8px;
+                            }}
+                            .message-row {{
+                                display: flex;
+                                margin-bottom: 12px;
+                                align-items: flex-start;
+                            }}
+                            .operator-row {{
+                                justify-content: flex-start;
+                            }}
+                            .caller-row {{
+                                justify-content: flex-end;
+                                flex-direction: row-reverse;
+                            }}
+                        </style>
+                    </head>
+                    <body>
+                        {chat_html}
+                    </body>
+                    </html>
+                """)
+                
+                # Scroll to the top to show the beginning of the conversation
+                self.transcript_area.verticalScrollBar().setValue(0)
         except FileNotFoundError:
             pass
 
@@ -1323,6 +1594,29 @@ class VoiceAnalysisUI(QMainWindow):
                         background-color: #2962ff;
                     }
                 """)
+            
+            # Update styles for active calls list and call cards
+            self.active_calls_list.setStyleSheet("""
+                QListWidget {
+                    background-color: #2d2d2d;
+                    border: 1px solid #3d3d3d;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+                QListWidget::item {
+                    margin-bottom: 8px;
+                }
+                QListWidget::item:selected {
+                    background-color: #3d3d3d;
+                }
+                QListWidget::item:hover {
+                    background-color: #363636;
+                }
+            """)
+            
+            # Update label of each card to be visible in dark mode
+            self.update_call_cards_for_dark_mode(True)
+            
         else:
             # Light theme styles
             self.setStyleSheet("")  # Reset to default light theme
@@ -1452,6 +1746,28 @@ class VoiceAnalysisUI(QMainWindow):
                         background-color: #bbdefb;
                     }
                 """)
+            
+            # Update styles for active calls list and call cards
+            self.active_calls_list.setStyleSheet("""
+                QListWidget {
+                    background-color: #f5f5f5;
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+                QListWidget::item {
+                    margin-bottom: 8px;
+                }
+                QListWidget::item:selected {
+                    background-color: #e3f2fd;
+                }
+                QListWidget::item:hover {
+                    background-color: #f8f9fa;
+                }
+            """)
+            
+            # Update label of each card to be visible in light mode
+            self.update_call_cards_for_dark_mode(False)
         
         # Preserve specific button styles
         self.update_component_styles()
@@ -1521,10 +1837,129 @@ class VoiceAnalysisUI(QMainWindow):
         # Get the conversation data stored in the item
         convo = item.data(Qt.UserRole)
         if convo:
-            # Update transcript area with the conversation text
-            self.transcript_area.setText(str(convo[1]))  # conversation text is at index 1
             # Update map with location
             self.update_map_location(str(convo[7]))  # location is at index 7
+            
+            # Format the conversation text in the chat-like interface
+            conversation_text = str(convo[1])
+            
+            # Parse the conversation into individual messages
+            lines = conversation_text.split("\n")
+            chat_html = "<div class=\"chat-container\">"
+            chat_html += "<h3 style=\"color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0;\">CALL TRANSCRIPT</h3>"
+            
+            for line in lines:
+                if line.strip():
+                    if line.startswith("EVI:"):
+                        # Operator message
+                        message = line[4:].strip()
+                        chat_html += f"""
+                            <div class="message-row operator-row">
+                                <div class="operator-icon">🤖</div>
+                                <div class="operator-message">{message}</div>
+                            </div>
+                        """
+                    elif line.startswith("You:"):
+                        # Caller message
+                        message = line[4:].strip()
+                        chat_html += f"""
+                            <div class="message-row caller-row">
+                                <div class="caller-icon">👤</div>
+                                <div class="caller-message">{message}</div>
+                            </div>
+                        """
+                    elif not line.startswith("<"):  # Skip tags like <USER_INTERRUPTION>
+                        # System message or untagged line
+                        if line.strip():
+                            chat_html += f"""
+                                <div style="text-align: center; color: #666; font-style: italic; margin: 8px 0; font-size: 12px;">
+                                    {line.strip()}
+                                </div>
+                            """
+            
+            chat_html += "</div>"
+            
+            # Update the HTML content
+            self.transcript_area.setHtml(f"""
+                <html>
+                <head>
+                    <style>
+                        body {{ 
+                            background-color: #f5f5f5; 
+                            font-family: Arial, sans-serif;
+                            margin: 0;
+                            padding: 5px;
+                        }}
+                        .chat-container {{
+                            display: flex;
+                            flex-direction: column;
+                            gap: 10px;
+                        }}
+                        .operator-message, .caller-message {{
+                            max-width: 80%;
+                            padding: 10px 14px;
+                            border-radius: 18px;
+                            margin: 2px 0;
+                            position: relative;
+                            display: inline-block;
+                        }}
+                        .operator-message {{
+                            background-color: #e9e9e9;
+                            color: #333;
+                            align-self: flex-start;
+                            margin-right: auto;
+                            border-bottom-left-radius: 5px;
+                        }}
+                        .caller-message {{
+                            background-color: #2979FF;
+                            color: white;
+                            align-self: flex-end;
+                            margin-left: auto;
+                            border-bottom-right-radius: 5px;
+                        }}
+                        .operator-icon, .caller-icon {{
+                            width: 28px;
+                            height: 28px;
+                            background-color: #ccc;
+                            border-radius: 50%;
+                            display: inline-flex;
+                            align-items: center;
+                            justify-content: center;
+                            margin-right: 8px;
+                            vertical-align: top;
+                            text-align: center;
+                            font-size: 14px;
+                        }}
+                        .operator-icon {{
+                            background-color: #e0e0e0;
+                        }}
+                        .caller-icon {{
+                            background-color: #e0e0e0;
+                            margin-right: 0;
+                            margin-left: 8px;
+                        }}
+                        .message-row {{
+                            display: flex;
+                            margin-bottom: 12px;
+                            align-items: flex-start;
+                        }}
+                        .operator-row {{
+                            justify-content: flex-start;
+                        }}
+                        .caller-row {{
+                            justify-content: flex-end;
+                            flex-direction: row-reverse;
+                        }}
+                    </style>
+                </head>
+                <body>
+                    {chat_html}
+                </body>
+                </html>
+            """)
+            
+            # Scroll to the top to show the beginning of the conversation
+            self.transcript_area.verticalScrollBar().setValue(0)
 
     def show_dispatch_options(self):
         """Show the dispatch options buttons."""
@@ -1549,6 +1984,13 @@ class VoiceAnalysisUI(QMainWindow):
         call_data = selected_item.data(Qt.UserRole)
         if call_data and len(call_data) > 7:
             location = str(call_data[7])
+            call_uid = str(call_data[0])
+            
+            # Update status to dispatched
+            if hasattr(self, 'call_status') and call_uid in self.call_status:
+                self.call_status[call_uid]['dispatched'] = True
+                # Update UI
+                self.update_conversation_list()
         
         # Create a custom message box for dispatch confirmation
         msg_box = QMessageBox(self)
@@ -1569,8 +2011,341 @@ class VoiceAnalysisUI(QMainWindow):
         # Hide options after dispatching
         self.dispatch_options.hide()
 
+    def mark_as_resolved(self):
+        """Mark the selected call as resolved."""
+        selected_item = self.active_calls_list.currentItem()
+        if not selected_item:
+            QMessageBox.warning(self, "Warning", "Please select an active call first.")
+            return
+        
+        # Get call data
+        call_data = selected_item.data(Qt.UserRole)
+        if call_data:
+            call_uid = str(call_data[0])
+            location = str(call_data[7]) if len(call_data) > 7 else "Unknown"
+            
+            # Update status to resolved
+            if hasattr(self, 'call_status') and call_uid in self.call_status:
+                self.call_status[call_uid]['resolved'] = True
+                # Update UI
+                self.update_conversation_list()
+            
+            # Display confirmation
+            QMessageBox.information(
+                self,
+                "Resolution Confirmation",
+                f"The emergency call from {location} has been marked as resolved."
+            )
+
+    def update_call_cards_for_dark_mode(self, is_dark):
+        """Update the call cards to maintain visibility in different themes"""
+        for i in range(self.active_calls_list.count()):
+            item = self.active_calls_list.item(i)
+            card_widget = self.active_calls_list.itemWidget(item)
+            
+            if card_widget:
+                # Get current border color based on status
+                call_data = item.data(Qt.UserRole)
+                call_uid = str(call_data[0]) if call_data else ""
+                
+                border_color = "#F44336"  # Default red
+                if call_uid in self.call_status:
+                    status = self.call_status[call_uid]
+                    if status['resolved']:
+                        border_color = "#4CAF50"  # Green for resolved
+                    elif status['dispatched']:
+                        border_color = "#FFEB3B"  # Yellow for dispatched
+                
+                # Update card background and text colors
+                if is_dark:
+                    # Dark mode card
+                    bg_color = "#2d2d2d"
+                    text_color = "#ffffff"
+                    secondary_color = "#bbbbbb"
+                    
+                    card_widget.setStyleSheet(f"""
+                        #callCard {{
+                            background-color: {bg_color};
+                            border: none;
+                            border-left: 4px solid {border_color};
+                            padding: 10px 15px;
+                        }}
+                    """)
+                else:
+                    # Light mode card
+                    bg_color = "white"
+                    text_color = "#212121"
+                    secondary_color = "#666666"
+                    
+                    card_widget.setStyleSheet(f"""
+                        #callCard {{
+                            background-color: {bg_color};
+                            border: none;
+                            border-left: 4px solid {border_color};
+                            padding: 10px 15px;
+                        }}
+                    """)
+                
+                # Update all labels in the card
+                labels = card_widget.findChildren(QLabel)
+                for label in labels:
+                    if "Time:" in label.text():
+                        label.setStyleSheet(f"color: {secondary_color}; padding: 2px;")
+                    else:
+                        label.setStyleSheet(f"color: {text_color}; padding: 2px;")
+
+class LoginWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Emergency Response System - Login")
+        self.setGeometry(100, 100, 400, 500)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: white;
+            }
+            QLabel {
+                color: #333;
+            }
+            QLineEdit {
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 14px;
+            }
+            QPushButton {
+                padding: 12px;
+                border: none;
+                border-radius: 4px;
+                font-size: 14px;
+                font-weight: bold;
+                color: white;
+            }
+            QPushButton#loginButton {
+                background-color: #007BFF;
+            }
+            QPushButton#loginButton:hover {
+                background-color: #0069D9;
+            }
+            QPushButton#createAccountButton {
+                background-color: #28A745;
+            }
+            QPushButton#createAccountButton:hover {
+                background-color: #218838;
+            }
+        """)
+        
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        # Main layout
+        main_layout = QVBoxLayout(self.central_widget)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        
+        # Title
+        title = QLabel("Emergency Response System")
+        title.setFont(QFont("Arial", 18, QFont.Bold))
+        title.setStyleSheet("color: #333; margin-bottom: 30px;")
+        title.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(title)
+        
+        # Login container
+        login_container = QFrame()
+        login_container.setFrameShape(QFrame.StyledPanel)
+        login_container.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 20px;
+            }
+        """)
+        login_layout = QVBoxLayout(login_container)
+        login_layout.setSpacing(15)
+        
+        # Username input
+        self.username_input = QLineEdit()
+        self.username_input.setPlaceholderText("Username")
+        login_layout.addWidget(self.username_input)
+        
+        # Password input
+        self.password_input = QLineEdit()
+        self.password_input.setPlaceholderText("Password")
+        self.password_input.setEchoMode(QLineEdit.Password)
+        login_layout.addWidget(self.password_input)
+        
+        # Login button
+        self.login_button = QPushButton("Login")
+        self.login_button.setObjectName("loginButton")
+        self.login_button.clicked.connect(self.login)
+        login_layout.addWidget(self.login_button)
+        
+        # Create account button
+        self.create_account_button = QPushButton("Create Account")
+        self.create_account_button.setObjectName("createAccountButton")
+        self.create_account_button.clicked.connect(self.show_create_account)
+        login_layout.addWidget(self.create_account_button)
+        
+        main_layout.addWidget(login_container)
+        
+        # Version info
+        version_label = QLabel("Version 1.0.0")
+        version_label.setAlignment(Qt.AlignCenter)
+        version_label.setStyleSheet("color: #999; margin-top: 15px;")
+        main_layout.addWidget(version_label)
+        
+        # Set up database for user accounts
+        self.setup_database()
+        
+        # Initialize status message label
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("color: red; margin-top: 10px;")
+        self.status_label.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(self.status_label)
+        
+        # Create account form (initially hidden)
+        self.create_account_widget = QWidget()
+        create_account_layout = QVBoxLayout(self.create_account_widget)
+        
+        create_account_title = QLabel("Create Account")
+        create_account_title.setFont(QFont("Arial", 16, QFont.Bold))
+        create_account_title.setAlignment(Qt.AlignCenter)
+        create_account_layout.addWidget(create_account_title)
+        
+        self.new_username_input = QLineEdit()
+        self.new_username_input.setPlaceholderText("New Username")
+        create_account_layout.addWidget(self.new_username_input)
+        
+        self.new_password_input = QLineEdit()
+        self.new_password_input.setPlaceholderText("New Password")
+        self.new_password_input.setEchoMode(QLineEdit.Password)
+        create_account_layout.addWidget(self.new_password_input)
+        
+        self.confirm_password_input = QLineEdit()
+        self.confirm_password_input.setPlaceholderText("Confirm Password")
+        self.confirm_password_input.setEchoMode(QLineEdit.Password)
+        create_account_layout.addWidget(self.confirm_password_input)
+        
+        create_button = QPushButton("Create Account")
+        create_button.setObjectName("loginButton")  # Reuse same styling
+        create_button.clicked.connect(self.create_account)
+        create_account_layout.addWidget(create_button)
+        
+        back_button = QPushButton("Back to Login")
+        back_button.clicked.connect(self.show_login)
+        create_account_layout.addWidget(back_button)
+        
+        self.create_account_widget.hide()
+        main_layout.addWidget(self.create_account_widget)
+        
+    def setup_database(self):
+        # Set up database for user accounts
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS users
+                    (username TEXT PRIMARY KEY, password TEXT)''')
+        conn.commit()
+        conn.close()
+        
+        # Create a default admin user if it doesn't exist
+        self.create_default_user()
+    
+    def create_default_user(self):
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        
+        # Check if admin user exists
+        c.execute("SELECT * FROM users WHERE username=?", ("admin",))
+        if not c.fetchone():
+            # Create default admin user with password 'admin'
+            hashed_password = hashlib.sha256("admin".encode()).hexdigest()
+            c.execute("INSERT INTO users VALUES (?, ?)", ("admin", hashed_password))
+            conn.commit()
+            print("Created default admin user")
+        
+        conn.close()
+    
+    def show_create_account(self):
+        self.create_account_widget.show()
+        self.login_button.setEnabled(False)
+        self.create_account_button.setEnabled(False)
+        self.username_input.setEnabled(False)
+        self.password_input.setEnabled(False)
+    
+    def show_login(self):
+        self.create_account_widget.hide()
+        self.login_button.setEnabled(True)
+        self.create_account_button.setEnabled(True)
+        self.username_input.setEnabled(True)
+        self.password_input.setEnabled(True)
+        self.status_label.setText("")
+    
+    def create_account(self):
+        username = self.new_username_input.text()
+        password = self.new_password_input.text()
+        confirm_password = self.confirm_password_input.text()
+        
+        if not username or not password:
+            self.status_label.setText("Username and password are required")
+            return
+        
+        if password != confirm_password:
+            self.status_label.setText("Passwords do not match")
+            return
+        
+        # Check if username already exists
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT * FROM users WHERE username=?", (username,))
+        if c.fetchone():
+            self.status_label.setText("Username already exists")
+            conn.close()
+            return
+        
+        # Create new user
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        c.execute("INSERT INTO users VALUES (?, ?)", (username, hashed_password))
+        conn.commit()
+        conn.close()
+        
+        self.status_label.setText("Account created successfully")
+        
+        # Clear inputs and go back to login
+        self.new_username_input.clear()
+        self.new_password_input.clear()
+        self.confirm_password_input.clear()
+        self.show_login()
+    
+    def login(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+        
+        if not username or not password:
+            self.status_label.setText("Username and password are required")
+            return
+        
+        # Check credentials
+        conn = sqlite3.connect('users.db')
+        c = conn.cursor()
+        c.execute("SELECT password FROM users WHERE username=?", (username,))
+        user = c.fetchone()
+        conn.close()
+        
+        if not user:
+            self.status_label.setText("Invalid username or password")
+            return
+        
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        if hashed_password != user[0]:
+            self.status_label.setText("Invalid username or password")
+            return
+        
+        # Login successful, launch main application
+        self.main_app = VoiceAnalysisUI()
+        self.main_app.show()
+        self.close()
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    window = VoiceAnalysisUI()
-    window.show()
+    login_window = LoginWindow()
+    login_window.show()
     sys.exit(app.exec_())
