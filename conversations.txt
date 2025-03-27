@@ -1,14 +1,14 @@
-<CHAT_METADATA> Chat ID: 3bd6f876-f734-48c2-80bd-1f309cfdcb68, Chat Group ID: 209f965f-fbc2-45c4-a704-45f8256dd66f
+<CHAT_METADATA> Chat ID: bfb6d5b8-9cc9-4b5f-981b-1fdcb7ab7374, Chat Group ID: a4c84cce-3fa3-42c1-b0b3-60e8e3f25912
 EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: Hello?
-You: Please state your emergency.
-You: My name is Arjun VK. I'm calling from a house in Gorikou. There are goons surrounding my house that are threatening
-EVI: Arjun VK, thank you for calling the emergency services.
+You: Hello? Please state your emergency My name is Vaishak.
+You: I'm calling from Kannur in Kerala.
+EVI: Thank goodness I answered!
 <USER_INTERRUPTION>
 <ASSISTANT_END>
-You: I'll just be careful. Thank you for calling the emergency
-EVI: Let's take care of this situation.
-EVI: Can you please provide me with your exact location in Gorikou, Arjun?
+You: My house is on fire. Please help me. I'm
+EVI: Oh no, I'm so sorry to hear that!
 <USER_INTERRUPTION>
 <ASSISTANT_END>
+You: Oh, no. I'm so sorry to hear that.
+EVI: Don't worry, Vaishak, we're here to help.

@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QHBoxLayout, QPushButton, QLabel, QTreeWidget, 
                            QTreeWidgetItem, QMessageBox, QTextEdit, QSplitter,
                            QStackedWidget, QLineEdit, QFrame, QGridLayout,
-                           QComboBox)
+                           QComboBox, QListWidget, QListWidgetItem)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWebEngineWidgets import QWebEngineView
@@ -252,13 +252,130 @@ class VoiceAnalysisUI(QMainWindow):
         self.end_button.setEnabled(False)
         button_layout.addWidget(self.end_button)
         
+        # Add Dispatch button and options
+        self.dispatch_button = QPushButton("Dispatch")
+        self.dispatch_button.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #1976D2;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.dispatch_button.clicked.connect(self.show_dispatch_options)
+        button_layout.addWidget(self.dispatch_button)
+
+        # Create dispatch options container
+        self.dispatch_options = QWidget()
+        self.dispatch_options.setFixedHeight(44)
+        dispatch_options_layout = QHBoxLayout(self.dispatch_options)
+        dispatch_options_layout.setContentsMargins(0, 0, 0, 0)
+        dispatch_options_layout.setSpacing(10)
+        
+        # Create styled service buttons with icons and labels
+        self.police_button = QPushButton("🚓 Police")
+        self.fire_button = QPushButton("🚒 Firefighters")
+        self.medic_button = QPushButton("🚑 Paramedics")
+        
+        service_buttons = [self.police_button, self.fire_button, self.medic_button]
+        
+        for button in service_buttons:
+            button.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #333333;
+                    padding: 8px 12px;
+                    border: 1px solid #dddddd;
+                    border-radius: 4px;
+                    font-weight: bold;
+                    min-width: 120px;
+                    text-align: left;
+                }
+                QPushButton:hover {
+                    background-color: #e3f2fd;
+                    border-color: #2196F3;
+                    color: #2196F3;
+                }
+                QPushButton:pressed {
+                    background-color: #bbdefb;
+                }
+            """)
+            dispatch_options_layout.addWidget(button)
+        
+        # Connect signals
+        self.police_button.clicked.connect(lambda: self.handle_dispatch_button("Police"))
+        self.fire_button.clicked.connect(lambda: self.handle_dispatch_button("Firefighters"))
+        self.medic_button.clicked.connect(lambda: self.handle_dispatch_button("Paramedics"))
+        
+        # Hide options initially
+        self.dispatch_options.hide()
+        
+        button_layout.addWidget(self.dispatch_options)
         button_layout.addStretch()
         layout.addLayout(button_layout)
         
-        # Create top section splitter (Transcript and Map)
+        # Create top section splitter (Active Calls, Map, Transcript)
         top_splitter = QSplitter(Qt.Horizontal)
         
-        # Left side - Transcript
+        # Left side - Active Calls Stack
+        active_calls_widget = QWidget()
+        active_calls_layout = QVBoxLayout(active_calls_widget)
+        
+        active_calls_label = QLabel("Active Emergency Calls")
+        active_calls_label.setFont(QFont("Arial", 14, QFont.Bold))
+        active_calls_label.setStyleSheet("color: #2196F3; margin-bottom: 10px;")
+        active_calls_layout.addWidget(active_calls_label)
+        
+        # Active calls list using QListWidget
+        self.active_calls_list = QListWidget()
+        self.active_calls_list.setStyleSheet("""
+            QListWidget {
+                background-color: #f5f5f5;
+                border: 1px solid #ddd;
+                border-radius: 8px;
+                padding: 10px;
+            }
+            QListWidget::item {
+                background-color: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 10px;
+                margin-bottom: 8px;
+            }
+            QListWidget::item:selected {
+                background-color: #e3f2fd;
+                border: 1px solid #2196F3;
+            }
+            QListWidget::item:hover {
+                background-color: #f8f9fa;
+            }
+        """)
+        self.active_calls_list.itemClicked.connect(self.on_active_call_clicked)
+        active_calls_layout.addWidget(self.active_calls_list)
+        
+        # Middle - Map
+        map_widget = QWidget()
+        map_layout = QVBoxLayout(map_widget)
+        
+        map_label = QLabel("Location Map")
+        map_label.setFont(QFont("Arial", 12, QFont.Bold))
+        map_label.setStyleSheet("color: #2196F3; margin-bottom: 5px;")
+        map_layout.addWidget(map_label)
+        
+        self.map_view = QWebEngineView()
+        self.map_view.setMinimumWidth(400)
+        self.map_view.setMinimumHeight(300)
+        self.map_view.setUrl(QUrl('https://www.openstreetmap.org'))
+        map_layout.addWidget(self.map_view)
+        
+        # Right side - Live Transcript
         transcript_widget = QWidget()
         transcript_layout = QVBoxLayout(transcript_widget)
         
@@ -282,26 +399,15 @@ class VoiceAnalysisUI(QMainWindow):
         """)
         transcript_layout.addWidget(self.transcript_area)
         
-        # Right side - Map
-        map_widget = QWidget()
-        map_layout = QVBoxLayout(map_widget)
-        
-        map_label = QLabel("Location Map")
-        map_label.setFont(QFont("Arial", 12, QFont.Bold))
-        map_label.setStyleSheet("color: #2196F3; margin-bottom: 5px;")
-        map_layout.addWidget(map_label)
-        
-        self.map_view = QWebEngineView()
-        self.map_view.setMinimumWidth(500)
-        self.map_view.setMinimumHeight(300)
-        self.map_view.setUrl(QUrl('https://www.openstreetmap.org'))
-        map_layout.addWidget(self.map_view)
-        
-        # Add transcript and map to top splitter
-        top_splitter.addWidget(transcript_widget)
+        # Add all sections to top splitter
+        top_splitter.addWidget(active_calls_widget)
         top_splitter.addWidget(map_widget)
-        top_splitter.setStretchFactor(0, 1)
-        top_splitter.setStretchFactor(1, 1)
+        top_splitter.addWidget(transcript_widget)
+        
+        # Set the size proportions (1:2:1)
+        top_splitter.setStretchFactor(0, 1)  # Active calls
+        top_splitter.setStretchFactor(1, 2)  # Map
+        top_splitter.setStretchFactor(2, 1)  # Transcript
         
         layout.addWidget(top_splitter)
         
@@ -820,6 +926,7 @@ class VoiceAnalysisUI(QMainWindow):
         print("\nUpdating conversation list...")
         self.conversation_tree.clear()
         self.active_conversation_tree.clear()  # Clear both trees
+        self.active_calls_list.clear()  # Clear active calls list
         conversations = self.fetch_conversations()
         print(f"Fetched {len(conversations)} conversations from database")
         
@@ -850,6 +957,36 @@ class VoiceAnalysisUI(QMainWindow):
                     history_item.setText(col, value)
                     active_item.setText(col, value)
                 
+                # Add to active calls list
+                if idx < 5:  # Show only the 5 most recent calls
+                    call_item = QListWidgetItem()
+                    call_widget = QWidget()
+                    call_layout = QVBoxLayout()
+                    
+                    # Title with location
+                    title = QLabel(f"- {tree_values[7] if tree_values[7] != 'Unknown' else 'Unknown Location'}")
+                    title.setFont(QFont("Arial", 10, QFont.Bold))
+                    call_layout.addWidget(title)
+                    
+                    # Timestamp
+                    timestamp = QLabel(tree_values[2])
+                    timestamp.setStyleSheet("color: #666;")
+                    call_layout.addWidget(timestamp)
+                    
+                    # Summary
+                    summary = QLabel(tree_values[3][:100] + "..." if len(tree_values[3]) > 100 else tree_values[3])
+                    summary.setWordWrap(True)
+                    call_layout.addWidget(summary)
+                    
+                    call_widget.setLayout(call_layout)
+                    call_item.setSizeHint(call_widget.sizeHint())
+                    
+                    # Store the conversation data in the item
+                    call_item.setData(Qt.UserRole, convo)
+                    
+                    self.active_calls_list.addItem(call_item)
+                    self.active_calls_list.setItemWidget(call_item, call_widget)
+                
                 print(f"Added conversation {idx + 1}: {tree_values[0]} - {tree_values[6]} - {tree_values[7]}")
             except Exception as e:
                 print(f"Error adding conversation {idx}: {str(e)}")
@@ -858,7 +995,7 @@ class VoiceAnalysisUI(QMainWindow):
         self.conversation_tree.verticalScrollBar().setValue(current_scroll)
         self.active_conversation_tree.verticalScrollBar().setValue(active_scroll)
         
-        # Ensure the latest conversation is visible in both trees
+        # Ensure the latest conversation is visible
         if conversations:
             self.conversation_tree.scrollToTop()
             self.active_conversation_tree.scrollToTop()
@@ -1163,6 +1300,29 @@ class VoiceAnalysisUI(QMainWindow):
                 title_label = card.layout().itemAt(0).widget()
                 if title_label:
                     title_label.setStyleSheet("color: #999999;")
+            
+            # Update dispatch options for dark mode
+            service_buttons = [self.police_button, self.fire_button, self.medic_button]
+            for button in service_buttons:
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #3d3d3d;
+                        color: #ffffff;
+                        padding: 8px 12px;
+                        border: 1px solid #555555;
+                        border-radius: 4px;
+                        font-weight: bold;
+                        min-width: 120px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #2979ff;
+                        border-color: #2979ff;
+                    }
+                    QPushButton:pressed {
+                        background-color: #2962ff;
+                    }
+                """)
         else:
             # Light theme styles
             self.setStyleSheet("")  # Reset to default light theme
@@ -1268,6 +1428,30 @@ class VoiceAnalysisUI(QMainWindow):
                 title_label = card.layout().itemAt(0).widget()
                 if title_label:
                     title_label.setStyleSheet("color: #666666;")
+            
+            # Update dispatch options for light mode
+            service_buttons = [self.police_button, self.fire_button, self.medic_button]
+            for button in service_buttons:
+                button.setStyleSheet("""
+                    QPushButton {
+                        background-color: #ffffff;
+                        color: #333333;
+                        padding: 8px 12px;
+                        border: 1px solid #dddddd;
+                        border-radius: 4px;
+                        font-weight: bold;
+                        min-width: 120px;
+                        text-align: left;
+                    }
+                    QPushButton:hover {
+                        background-color: #e3f2fd;
+                        border-color: #2196F3;
+                        color: #2196F3;
+                    }
+                    QPushButton:pressed {
+                        background-color: #bbdefb;
+                    }
+                """)
         
         # Preserve specific button styles
         self.update_component_styles()
@@ -1332,6 +1516,58 @@ class VoiceAnalysisUI(QMainWindow):
             }
         """
         self.end_button.setStyleSheet(end_button_style)
+
+    def on_active_call_clicked(self, item):
+        # Get the conversation data stored in the item
+        convo = item.data(Qt.UserRole)
+        if convo:
+            # Update transcript area with the conversation text
+            self.transcript_area.setText(str(convo[1]))  # conversation text is at index 1
+            # Update map with location
+            self.update_map_location(str(convo[7]))  # location is at index 7
+
+    def show_dispatch_options(self):
+        """Show the dispatch options buttons."""
+        if not self.active_calls_list.currentItem():
+            QMessageBox.warning(self, "Warning", "Please select an active call first.")
+            return
+        
+        if self.dispatch_options.isVisible():
+            self.dispatch_options.hide()
+        else:
+            self.dispatch_options.show()
+
+    def handle_dispatch_button(self, service):
+        """Handle the dispatch button click with the specified service."""
+        selected_item = self.active_calls_list.currentItem()
+        if not selected_item:
+            return
+            
+        location = "Unknown"
+        
+        # Get location from the selected call
+        call_data = selected_item.data(Qt.UserRole)
+        if call_data and len(call_data) > 7:
+            location = str(call_data[7])
+        
+        # Create a custom message box for dispatch confirmation
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Dispatch Confirmation")
+        
+        # Set icon based on service type
+        if service == "Police":
+            msg_box.setIconPixmap(QLabel("🚓").grab())
+        elif service == "Firefighters":
+            msg_box.setIconPixmap(QLabel("🚒").grab())
+        elif service == "Paramedics":
+            msg_box.setIconPixmap(QLabel("🚑").grab())
+        
+        msg_box.setText(f"{service} have been dispatched to {location}.")
+        msg_box.setStandardButtons(QMessageBox.Ok)
+        msg_box.exec_()
+        
+        # Hide options after dispatching
+        self.dispatch_options.hide()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
