@@ -10,12 +10,13 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QUrl, QSize
 from PyQt5.QtGui import QFont, QPainter
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtChart import (QChart, QChartView, QPieSeries, QBarSeries,
-                          QBarSet, QBarCategoryAxis, QValueAxis)
+                          QBarSet, QBarCategoryAxis, QValueAxis, QLineSeries, QDateTimeAxis)
 import sqlite3
 import signal
 from datetime import datetime
 from collections import Counter
 import hashlib  # For password hashing
+from PyQt5.QtCore import QDateTime
 
 class ConversationThread(QThread):
     finished = pyqtSignal()
@@ -205,6 +206,8 @@ class VoiceAnalysisUI(QMainWindow):
         
         # Load conversations when the application starts
         QTimer.singleShot(100, self.update_conversation_list)  # Use QTimer to ensure UI is fully initialized
+        # Initialize analytics with real data
+        QTimer.singleShot(500, self.update_analytics)
         
     def create_active_calls_page(self):
         page = QWidget()
@@ -816,12 +819,15 @@ class VoiceAnalysisUI(QMainWindow):
         """)
         
         layout = QVBoxLayout(card)
+        layout.setSpacing(5)
         
         title_label = QLabel(title)
+        title_label.setObjectName("statCardTitle")
         title_label.setFont(QFont("Arial", 10))
         title_label.setStyleSheet("color: #666;")
         
         value_label = QLabel(value)
+        value_label.setObjectName("statCardValue")
         value_label.setFont(QFont("Arial", 24, QFont.Bold))
         value_label.setStyleSheet("color: #2196F3;")
         
@@ -829,6 +835,14 @@ class VoiceAnalysisUI(QMainWindow):
         layout.addWidget(value_label)
         
         return card
+
+    def _update_stat_card(self, card, value):
+        # Update the value label in the stat card
+        value_label = card.findChild(QLabel, "statCardValue")
+        if value_label:
+            value_label.setText(value)
+        else:
+            print("Warning: Could not find value label in stat card")
 
     def create_pie_chart(self, title):
         series = QPieSeries()
@@ -846,6 +860,12 @@ class VoiceAnalysisUI(QMainWindow):
         chart.legend().setVisible(True)
         chart.legend().setAlignment(Qt.AlignRight)
         
+        # Style the title
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(12)
+        chart.setTitleFont(title_font)
+        
         chartview = QChartView(chart)
         chartview.setRenderHint(QPainter.Antialiasing)
         
@@ -854,9 +874,8 @@ class VoiceAnalysisUI(QMainWindow):
     def create_bar_chart(self, title):
         series = QBarSeries()
         
-        # Sample data - will be updated with real data
+        # Empty bar set - data will be populated in update_analytics
         bar_set = QBarSet("Emergency Types")
-        bar_set.append([40, 30, 20, 10])  # Fire, Medical, Crime, Other
         series.append(bar_set)
         
         chart = QChart()
@@ -864,16 +883,28 @@ class VoiceAnalysisUI(QMainWindow):
         chart.setTitle(title)
         chart.setAnimationOptions(QChart.SeriesAnimations)
         
-        categories = ["Fire", "Medical", "Crime", "Other"]
+        categories = ["HIGH", "MEDIUM", "LOW", "SPAM"]
         axis_x = QBarCategoryAxis()
         axis_x.append(categories)
+        axis_x.setTitleText("Emergency Criticality")  # Add x-axis title
         chart.addAxis(axis_x, Qt.AlignBottom)
         series.attachAxis(axis_x)
         
         axis_y = QValueAxis()
-        axis_y.setRange(0, 50)
+        axis_y.setRange(0, 10)  # Initial range, will be updated with real data
+        axis_y.setTitleText("Number of Calls")  # Add y-axis title
         chart.addAxis(axis_y, Qt.AlignLeft)
         series.attachAxis(axis_y)
+        
+        # Make labels visible and styled
+        axis_x.setLabelsFont(QFont("Arial", 9))
+        axis_y.setLabelsFont(QFont("Arial", 9))
+        
+        # Style the title
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(12)
+        chart.setTitleFont(title_font)
         
         chart.legend().setVisible(False)
         
@@ -883,10 +914,42 @@ class VoiceAnalysisUI(QMainWindow):
         return chartview
 
     def create_line_chart(self, title):
-        chart = QChart()
-        chart.setTitle(title)
+        # Create an empty line series for call volume
+        series = QLineSeries()
+        series.setName("Call Volume")
         
-        # This will be implemented with real data
+        chart = QChart()
+        chart.addSeries(series)
+        chart.setTitle(title)
+        chart.setAnimationOptions(QChart.SeriesAnimations)
+        
+        # Create axes
+        axis_x = QDateTimeAxis()
+        axis_x.setFormat("MMM dd")
+        axis_x.setTitleText("Date")
+        axis_x.setLabelsAngle(-45)  # Angle labels for better readability
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
+        
+        axis_y = QValueAxis()
+        axis_y.setLabelFormat("%d")
+        axis_y.setTitleText("Number of Calls")
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
+        
+        # Make labels visible and styled
+        axis_x.setLabelsFont(QFont("Arial", 9))
+        axis_y.setLabelsFont(QFont("Arial", 9))
+        
+        # Style the title
+        title_font = QFont()
+        title_font.setBold(True)
+        title_font.setPointSize(12)
+        chart.setTitleFont(title_font)
+        
+        chart.legend().setVisible(True)
+        chart.legend().setAlignment(Qt.AlignBottom)
+        
         chartview = QChartView(chart)
         chartview.setRenderHint(QPainter.Antialiasing)
         
@@ -903,12 +966,19 @@ class VoiceAnalysisUI(QMainWindow):
             # Query based on time period
             if period == "Last 24 Hours":
                 time_filter = "datetime(timestamp) >= datetime('now', '-1 day')"
+                days_to_look_back = 1
             elif period == "Last Week":
                 time_filter = "datetime(timestamp) >= datetime('now', '-7 days')"
+                days_to_look_back = 7
             elif period == "Last Month":
                 time_filter = "datetime(timestamp) >= datetime('now', '-30 days')"
+                days_to_look_back = 30
             else:  # All Time
                 time_filter = "1=1"
+                # Get the oldest record to determine range
+                c.execute("SELECT julianday('now') - julianday(MIN(timestamp)) FROM conversations")
+                result = c.fetchone()
+                days_to_look_back = int(result[0]) if result and result[0] else 30  # Default to 30 if no data
             
             # Get total calls
             c.execute(f"SELECT COUNT(*) FROM conversations WHERE {time_filter}")
@@ -921,33 +991,163 @@ class VoiceAnalysisUI(QMainWindow):
             
             # Get emergency distribution
             c.execute(f"SELECT criticality FROM conversations WHERE {time_filter}")
-            criticalities = [row[0] for row in c.fetchall()]
-            high_priority = sum(1 for c in criticalities if c.lower() == 'high')
+            criticalities = [row[0].upper() if row[0] else "UNKNOWN" for row in c.fetchall()]
+            
+            # Count different criticality levels
+            high_priority = sum(1 for c in criticalities if c == 'HIGH')
+            medium_priority = sum(1 for c in criticalities if c == 'MEDIUM')
+            low_priority = sum(1 for c in criticalities if c == 'LOW')
+            
+            # Emergency rate is percentage of high criticality calls
             emergency_rate = (high_priority / total_calls * 100) if total_calls > 0 else 0
+            
+            # Get average call duration (simulated since we don't track actual duration)
+            # Instead, let's use word count as a proxy for call duration
+            c.execute(f"SELECT conversation FROM conversations WHERE {time_filter}")
+            conversations = c.fetchall()
+            total_words = sum(len(str(convo[0]).split()) for convo in conversations if convo[0])
+            avg_words = total_words / total_calls if total_calls > 0 else 0
+            # Assume average speaking rate of 150 words per minute
+            avg_duration = avg_words / 150 if avg_words > 0 else 0
             
             # Get location distribution
             c.execute(f"SELECT location FROM conversations WHERE {time_filter}")
-            locations = [row[0] for row in c.fetchall()]
+            locations = [row[0] if row[0] and row[0].lower() != "unknown" else "Other" for row in c.fetchall()]
             location_counts = Counter(locations)
+            
+            # Get data for call volume timeline
+            c.execute(f"""
+                SELECT 
+                    date(timestamp) as call_date,
+                    COUNT(*) as call_count
+                FROM conversations
+                WHERE {time_filter}
+                GROUP BY date(timestamp)
+                ORDER BY call_date
+            """)
+            date_counts = c.fetchall()
             
             # Update statistics cards
             self._update_stat_card(self.total_calls_label, str(total_calls))
-            self._update_stat_card(self.spam_rate_label, f"{spam_rate:.1f}%")
+            self._update_stat_card(self.avg_duration_label, f"{avg_duration:.1f} min")
             self._update_stat_card(self.emergency_rate_label, f"{emergency_rate:.1f}%")
+            self._update_stat_card(self.spam_rate_label, f"{spam_rate:.1f}%")
             
-            # Update pie chart
+            # Update location pie chart
             self._update_location_chart(location_counts)
+            
+            # Update criticality bar chart
+            self._update_criticality_chart(high_priority, medium_priority, low_priority, spam_calls)
+            
+            # Update timeline chart
+            self._update_timeline_chart(date_counts, days_to_look_back)
             
             conn.close()
             
         except Exception as e:
             print(f"Error updating analytics: {e}")
-
-    def _update_stat_card(self, card, value):
-        # Update the value label in the stat card
-        value_label = card.findChild(QLabel, "", Qt.FindChildrenRecursively)
-        if value_label:
-            value_label.setText(value)
+            import traceback
+            traceback.print_exc()
+            
+    def _update_criticality_chart(self, high, medium, low, spam):
+        # Update the emergency type bar chart with real data
+        chart = self.type_chart.chart()
+        
+        # Remove existing series
+        chart.removeAllSeries()
+        
+        # Create new series with actual data
+        series = QBarSeries()
+        bar_set = QBarSet("Emergency Types")
+        bar_set.append([high, medium, low, spam])
+        series.append(bar_set)
+        
+        # Add the series to the chart
+        chart.addSeries(series)
+        
+        # Recreate axes
+        categories = ["HIGH", "MEDIUM", "LOW", "SPAM"]
+        axis_x = QBarCategoryAxis()
+        axis_x.append(categories)
+        axis_x.setTitleText("Emergency Criticality")  # Add x-axis title
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
+        
+        # Update Y-axis range
+        max_value = max(high, medium, low, spam)
+        if max_value == 0:
+            max_value = 10  # Default if no data
+            
+        axis_y = QValueAxis()
+        axis_y.setRange(0, max_value * 1.1)  # Add 10% headroom
+        axis_y.setLabelFormat("%d")
+        axis_y.setTitleText("Number of Calls")  # Add y-axis title
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
+        
+        # Make labels visible and styled
+        axis_x.setLabelsFont(QFont("Arial", 9))
+        axis_y.setLabelsFont(QFont("Arial", 9))
+        
+    def _update_timeline_chart(self, date_counts, days_to_look_back):
+        from PyQt5.QtCore import QDateTime, Qt
+        from PyQt5.QtChart import QLineSeries, QDateTimeAxis, QValueAxis
+        
+        # Get chart and clear existing series
+        chart = self.timeline_chart.chart()
+        chart.removeAllSeries()
+        
+        # Create a new series
+        series = QLineSeries()
+        series.setName("Call Volume")
+        
+        # If we have data points
+        if date_counts:
+            # Convert date strings to QDateTime and add to series
+            max_count = 0
+            for date_str, count in date_counts:
+                try:
+                    date = QDateTime.fromString(date_str, "yyyy-MM-dd")
+                    series.append(date.toMSecsSinceEpoch(), count)
+                    max_count = max(max_count, count)
+                except Exception as e:
+                    print(f"Error adding date point: {e} - {date_str}")
+        else:
+            # Add empty data point to avoid errors
+            now = QDateTime.currentDateTime()
+            series.append(now.toMSecsSinceEpoch(), 0)
+            max_count = 10  # Default
+            
+        # Add series to chart
+        chart.addSeries(series)
+            
+        # Create date axis
+        axis_x = QDateTimeAxis()
+        axis_x.setFormat("MMM dd")
+        axis_x.setTitleText("Date")
+        axis_x.setLabelsAngle(-45)  # Angle labels for better readability
+        
+        # Set range to cover the period
+        now = QDateTime.currentDateTime()
+        start_date = now.addDays(-days_to_look_back)
+        axis_x.setRange(start_date, now)
+        
+        # Add axes
+        chart.addAxis(axis_x, Qt.AlignBottom)
+        series.attachAxis(axis_x)
+        
+        # Create value axis with appropriate range
+        axis_y = QValueAxis()
+        axis_y.setLabelFormat("%d")
+        axis_y.setTitleText("Number of Calls")
+        axis_y.setRange(0, max(max_count * 1.1, 5))  # Add 10% headroom, minimum of 5
+        
+        chart.addAxis(axis_y, Qt.AlignLeft)
+        series.attachAxis(axis_y)
+        
+        # Make labels visible and styled
+        axis_x.setLabelsFont(QFont("Arial", 9))
+        axis_y.setLabelsFont(QFont("Arial", 9))
 
     def _update_location_chart(self, location_counts):
         # Update the location pie chart with new data
@@ -961,15 +1161,25 @@ class VoiceAnalysisUI(QMainWindow):
         # Add top locations to pie chart
         for location, count in top_locations:
             series.append(location, count)
+            # Set label visible for each slice
+            last_slice = series.slices()[-1]
+            last_slice.setLabelVisible(True)
         
         # Add "Other" if there are more locations
         if other_count > 0:
             series.append("Other", other_count)
+            series.slices()[-1].setLabelVisible(True)
         
         # Update the chart
-        self.location_chart.chart().removeAllSeries()
-        self.location_chart.chart().addSeries(series)
+        chart = self.location_chart.chart()
+        chart.removeAllSeries()
+        chart.addSeries(series)
         
+        # Ensure legend is visible and properly positioned
+        chart.legend().setVisible(True)
+        chart.legend().setAlignment(Qt.AlignRight)
+        chart.legend().setFont(QFont("Arial", 9))
+
     def switch_page(self, index):
         # Update button states
         buttons = [self.active_calls_btn, self.call_history_btn, 
@@ -979,6 +1189,10 @@ class VoiceAnalysisUI(QMainWindow):
         
         # Switch to selected page
         self.stacked_widget.setCurrentIndex(index)
+        
+        # If switching to analytics page, update the data
+        if index == 2:  # Analytics page is at index 2
+            self.update_analytics()
 
     def fetch_conversations(self):
         try:
@@ -1533,16 +1747,28 @@ class VoiceAnalysisUI(QMainWindow):
                 self.location_chart.chart().setBackgroundBrush(Qt.darkGray)
                 self.location_chart.chart().setTitleBrush(Qt.white)
                 self.location_chart.setStyleSheet("background-color: #2d2d2d;")
+                # Update slices to have visible labels
+                for series in self.location_chart.chart().series():
+                    for slice in series.slices():
+                        slice.setLabelBrush(Qt.white)
             
             if hasattr(self, 'type_chart'):
                 self.type_chart.chart().setBackgroundBrush(Qt.darkGray)
                 self.type_chart.chart().setTitleBrush(Qt.white)
                 self.type_chart.setStyleSheet("background-color: #2d2d2d;")
+                # Update axis colors for dark mode
+                for axis in self.type_chart.chart().axes():
+                    axis.setLabelsColor(Qt.white)
+                    axis.setTitleBrush(Qt.white)
             
             if hasattr(self, 'timeline_chart'):
                 self.timeline_chart.chart().setBackgroundBrush(Qt.darkGray)
                 self.timeline_chart.chart().setTitleBrush(Qt.white)
                 self.timeline_chart.setStyleSheet("background-color: #2d2d2d;")
+                # Update axis colors for dark mode
+                for axis in self.timeline_chart.chart().axes():
+                    axis.setLabelsColor(Qt.white)
+                    axis.setTitleBrush(Qt.white)
             
             # Update stat cards for dark mode
             stat_card_style = """
@@ -1552,10 +1778,10 @@ class VoiceAnalysisUI(QMainWindow):
                     padding: 15px;
                     border: 1px solid #3d3d3d;
                 }
-                QLabel {
-                    color: #ffffff;
+                QLabel#statCardTitle {
+                    color: #999999;
                 }
-                QLabel[value="true"] {
+                QLabel#statCardValue {
                     color: #2196F3;
                 }
             """
@@ -1703,10 +1929,10 @@ class VoiceAnalysisUI(QMainWindow):
                     padding: 15px;
                     border: 1px solid #e0e0e0;
                 }
-                QLabel {
+                QLabel#statCardTitle {
                     color: #666666;
                 }
-                QLabel[value="true"] {
+                QLabel#statCardValue {
                     color: #2196F3;
                 }
             """

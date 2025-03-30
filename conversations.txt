@@ -1,17 +1,13 @@
-<CHAT_METADATA> Chat ID: 1ee0b7f6-c364-4792-bdb1-0cdf4323ef86, Chat Group ID: 9069b230-9da0-4fb1-aeac-501ff1861b54
+<CHAT_METADATA> Chat ID: 47590e33-c110-46e4-8aa1-f4a2d7c0eb36, Chat Group ID: 94954981-6eaa-4a5d-be60-ae9c13bbb58b
 EVI: Hello. Please state your Emergency!
 <ASSISTANT_END>
-You: Hello? Please state your emergency.
-You: My name is Michael Faraday. I'm studying in Norman College Engineering, Kanoor in Kerala.
-EVI: Nice to speak with you, Michael Faraday!
+You: My name is Arjun. I'm calling from Kannur in Kerala. My house is on fire. Please help me. I'm in danger.
+EVI: Arjun, this is Emergency Call Center Assistant talking.
+EVI: I'm so sorry to hear that your house is on fire.
+EVI: Can you please stay calm and give me your exact location in Kannur, Kerala?
 <USER_INTERRUPTION>
 <ASSISTANT_END>
-You: Nice to speak.
-You: You, Michael, Saturday. I don't have any friends. Will you be my friend?
-EVI: Hello Michael, I'm happy to chat with you, but as a 911 operator, my purpose is to help people in emergency situations, not to make friends.
-<USER_INTERRUPTION>
-<ASSISTANT_END>
-You: Hello, Michael. Well, I'm happy to chat with you, but
-EVI: I'm glad you're willing to chat, Michael.
+You: Southern time code.
+EVI: Arjun, I understand.
 <USER_INTERRUPTION>
 <ASSISTANT_END>
